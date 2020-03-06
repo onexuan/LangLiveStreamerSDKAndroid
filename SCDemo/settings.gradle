@@ -1,0 +1,1 @@
+include ':app', ':AgoraRTCLib', ':LangStreamer1Kit', ':LangStreamer2Kit', ':LangGPUImageLib', ':SenseMeLibrary', ':yfGraphicBuffer'

@@ -1,0 +1,101 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion rootProject.ext.compileSdkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
+
+    repositories {
+        flatDir {
+            dirs 'libs'
+        }
+    }
+
+    defaultConfig {
+        applicationId "com.lang.lang"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 5
+        versionName "2.5.0"
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+    }
+    signingConfigs {
+        releaseConfig {
+            storeFile file("../keystore/scdemo.jks")
+            storePassword 'scdemo'
+            keyAlias 'scdemo'
+            keyPassword 'scdemo'
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.releaseConfig
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            signingConfig signingConfigs.releaseConfig
+            debuggable true
+            jniDebuggable true
+            renderscriptDebuggable true
+        }
+    }
+    lintOptions {
+        checkReleaseBuilds false
+        // Or, if you prefer, you can continue to check for errors in release builds,
+        // but continue the build even when errors are found:
+        abortOnError false
+    }
+    packagingOptions {
+
+        exclude 'lib/armeabi/**'
+        //exclude 'lib/armeabi-v7a/**'
+        //exclude 'lib/arm64-v8a/**'
+        exclude 'lib/mips/**'
+        exclude 'lib/mips64/**'
+        //exclude 'lib/x86/**'
+        exclude 'lib/x86_64/**'
+    }
+   /* splits {
+        abi {
+            enable true
+            reset()
+            include 'armeabi-v7a','x86'
+            universalApk false //generate an additional APK that contains all the ABIs
+        }
+    }*/
+
+    aaptOptions {
+        noCompress "tflite"
+        noCompress "lite"
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    androidTestImplementation('com.android.support.test.espresso:espresso-core:2.2.2', {
+        implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+        exclude group: 'com.android.support', module: 'support-annotations'
+    })
+    implementation 'com.android.support:appcompat-v7:25.3.0'
+    implementation 'com.android.support:support-v4:25.3.0'
+    implementation 'com.android.support:design:25.3.0'
+    testImplementation 'junit:junit:4.12'
+    //butterknife
+    implementation 'com.jakewharton:butterknife:8.4.0'
+    annotationProcessor 'com.jakewharton:butterknife-compiler:8.4.0'
+    //zxing
+    implementation 'com.journeyapps:zxing-android-embedded:3.2.0@aar'
+    implementation 'com.google.zxing:core:3.2.1'
+    // Because RxAndroid releases are few and far between, it is recommended you also
+    implementation 'io.reactivex:rxandroid:1.2.1'
+    // explicitly depend on RxJava's latest version for bug fixes and new features.
+    implementation 'io.reactivex:rxjava:1.1.6'
+    //implementation project(':LangStreamer1Kit')
+    //implementation project(':LangStreamer2Kit')
+    implementation files('libs/LangStreamer1kit_1.9.0.aar')
+    implementation files('libs/LangStreamer2kit_0.9.1.aar')
+    implementation files('libs/AgoraRTCLib_1.0.3.aar')
+    implementation files('libs/LangGPUImageLib_2.0.2.aar')
+    implementation files('libs/SenseMeLibrary_1.0.11.aar')
+    implementation files('libs/yfGraphicBuffer_1.0.5.aar')
+}

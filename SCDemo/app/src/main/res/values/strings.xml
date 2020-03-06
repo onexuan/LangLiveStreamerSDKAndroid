@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">直播测试</string>
+
+    <!-- 二维码扫描 -->
+    <string name="scanner_cancel_tip">取消</string>
+    <string name="scanner_tip">请将二维码放入框内</string>
+</resources>

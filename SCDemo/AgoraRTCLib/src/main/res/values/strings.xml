@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">AgoraRTCLib</string>
+    <string name="app_rtc_id">query-id-from-agora</string>>
+</resources>

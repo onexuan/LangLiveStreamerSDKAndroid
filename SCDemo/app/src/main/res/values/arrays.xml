@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="beauty_levels">
+        <item>关闭美颜</item>
+        <item>1级美颜</item>
+        <item>2级美颜</item>
+        <item>3级美颜</item>
+        <item>4级美颜</item>
+        <item>5级美颜</item>
+    </string-array>
+
+    <string-array name="filters">
+        <item>NONE</item>
+        <item>FAIRYTALE</item>
+        <item>SUNRISE</item>
+        <item>SUNSET</item>
+        <item>WHITECAT</item>
+        <item>BLACKCAT</item>
+        <item>SKINWHITEN</item>
+        <item>HEALTHY</item>
+        <item>SWEETS</item>
+        <item>ROMANCE</item>
+        <item>SAKURA</item>
+        <item>WARM</item>
+        <item>ANTIQUE</item>
+        <item>NOSTALGIA</item>
+        <item>CALM</item>
+        <item>LATTE</item>
+        <item>TENDER</item>
+        <item>COOL</item>
+        <item>EMERALD</item>
+        <item>EVERGREEN</item>
+        <item>CRAYON</item>
+        <item>SKETCH</item>
+        <item>AMARO</item>
+        <item>BRANNAN</item>
+        <item>BROOKLYN</item>
+        <item>EARLYBIRD</item>
+        <item>FREUD</item>
+        <item>HEFE</item>
+        <item>HUDSON</item>
+        <item>INKWELL</item>
+        <item>KEVIN</item>
+        <item>LOMO</item>
+        <item>N1977</item>
+        <item>NASHVILLE</item>
+        <item>PIXAR</item>
+        <item>RISE</item>
+        <item>SIERRA</item>
+        <item>SUTRO</item>
+        <item>TOASTER2</item>
+        <item>WALDEN</item>
+    </string-array>
+
+    <string-array name="zooms">
+        <item>x1.0</item>
+        <item>x2.0</item>
+        <item>x3.0</item>
+    </string-array>
+
+    <string-array name="faceppstickers">
+        <item>none</item>
+        <item>bear</item>
+        <item>pinkCat</item>
+        <item>blueBear</item>
+        <item>deer</item>
+        <item>diadema</item>
+        <item>dog</item>
+        <item>lolipopRabbit</item>
+        <item>pineApple</item>
+        <item>bellCat</item>
+        <item>whiteFlowers</item>
+        <item>lanternGirl</item>
+        <item>imperialcrown</item>
+    </string-array>
+
+    <string-array name="sensemestickers">
+        <item>none</item>
+        <item>bunny</item>
+        <item>cat</item>
+        <item>chaoji</item>
+        <item>emo</item>
+        <item>huahuan</item>
+        <item>mingri</item>
+        <item>nvc</item>
+        <item>rabbiteating</item>
+        <item>renqi</item>
+        <item>tianshi</item>
+        <item>tools-lizi</item>
+        <item>zhanxingcc</item>
+        <item>saiyaren</item>
+<!--        <item>beauty</item>-->
+    </string-array>
+
+</resources>

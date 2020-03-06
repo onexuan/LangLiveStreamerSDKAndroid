@@ -1,0 +1,3 @@
+УмТы:scdemo
+
+alias:scdemo
