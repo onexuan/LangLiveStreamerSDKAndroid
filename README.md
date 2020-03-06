@@ -2,7 +2,7 @@
 a rtmp live streamer sdk for demo usage
 
 Hi Everyone: I am glad that you are interested in this project.
-This is a camera streamer based android project which is used to demonstrating camera capturing and rtmp broadcasting usage.
+This is a camera streamer based android project which is used to demonstrate camera capturing and rtmp broadcasting usage.
 
 Features
 
