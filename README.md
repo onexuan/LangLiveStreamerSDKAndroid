@@ -8,13 +8,20 @@ Features
 
 Android
 platform API 21 ~ current newest version
-cpu: armeabi-v7a arm64-v8a
-common capturing audio & video frames using hw-encoder (MediaCodec)
-rtmp streaming with pili-librtmp support(many changes from origin code)
-rtmp auto reconnect support when network interrupted
-gpuimage support for realtime capture filter
-face tracker support using SenseTime SDK(confidential part)
-rtc video support using AgoraRTC library(confidential part)
+
+cpu: armeabi-v7a arm64-v8a 
+
+common capturing audio & video frames using hw-encoder (MediaCodec) 
+
+rtmp streaming with pili-librtmp support(many changes from origin code) 
+
+rtmp auto reconnect support when network interrupted 
+
+gpuimage support for realtime capture filter 
+
+face tracker support using SenseTime SDK(confidential part) 
+
+rtc video support using AgoraRTC library(confidential part) 
  
  
 Support 
