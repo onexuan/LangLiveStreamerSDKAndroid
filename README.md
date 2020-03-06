@@ -4,7 +4,7 @@ a rtmp live streamer sdk for demo usage
 Hi Everyone: I am glad that you are interested in this project.
 This is a camera streamer based android project which is used to demonstrating camera capturing and rtmp broadcasting usage.
 
-features
+#features
 
 Android
 platform API 21 ~ current newest version
@@ -17,5 +17,5 @@ face tracker support using SenseTime SDK(confidential part)
 rtc video support using AgoraRTC library(confidential part)
  
  
-Support 
+#Support 
 public technical dissusion on github dashboard is reasonable and helpful.
