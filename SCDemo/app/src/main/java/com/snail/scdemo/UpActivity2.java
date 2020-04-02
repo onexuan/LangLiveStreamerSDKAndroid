@@ -45,6 +45,8 @@ import com.snail.scdemo.view.GestureView;
 import net.lang.streamer2.LangRtcInfo;
 import net.lang.streamer2.LangRtcUser;
 import net.lang.streamer2.LangRtmpInfo;
+import net.lang.streamer2.config.LangAnimationConfig;
+import net.lang.streamer2.config.LangBeautyhairConfig;
 import net.lang.streamer2.config.LangFaceuConfig;
 import net.lang.streamer2.config.LangRtcConfig;
 import net.lang.streamer2.config.LangStreamerConfig;
@@ -96,6 +98,8 @@ public class UpActivity2 extends BaseActivity implements ILangCameraStreamer.ILa
     TextView mRtmpVideoDropCountsView;
     @BindView(R.id.up2_recordMessageDebug)
     TextView mRecordMessageTextView;
+    @BindView(R.id.up2_animationMessageDebug)
+    TextView mAnimationMessageTextView;
     @BindView(R.id.up2_rtcLocalConnectStatusDebug)
     TextView mRtcConnectStatusTextView;
     @BindView(R.id.up2_rtcMessageDebug)
@@ -151,6 +155,8 @@ public class UpActivity2 extends BaseActivity implements ILangCameraStreamer.ILa
 
     @BindArray(R.array.beauty_levels)
     String[] mBeautyLevels;
+    @BindArray(R.array.gift_animations)
+    String[] mGiftAnimations;
     @BindArray(R.array.sensemestickers)
     String[] mSenseMeStickers;
     @BindArray(R.array.filters)
@@ -166,9 +172,12 @@ public class UpActivity2 extends BaseActivity implements ILangCameraStreamer.ILa
     private int mBeautyWhich = 3;
     private int mFilterWhich = 0;
     private int mFaceuWhich = 0;
-    private List<String> mFaceuStickersList = new java.util.ArrayList<String>();;
+    private int mAnimationWhich = 0;
+    private List<String> mFaceuStickersList = new java.util.ArrayList<String>();
+    private List<String> mAnimationsList = new java.util.ArrayList<String>();
     private LangFaceuConfig mFaceuConfig = new LangFaceuConfig();
-
+    private LangBeautyhairConfig mBeautyHairConfig = new LangBeautyhairConfig(0.5f);
+    private LangAnimationConfig mAnimationConfig = new LangAnimationConfig();
     private ILangCameraStreamer.LangCameraBeauty mBeautyLevel = ILangCameraStreamer.LangCameraBeauty.LANG_BEAUTY_LEVEL_3;
     private ILangCameraStreamer mCameraStreamer = null;
 
@@ -185,6 +194,7 @@ public class UpActivity2 extends BaseActivity implements ILangCameraStreamer.ILa
 
         checkRequiredPermissions();
         preloadStickerPackage();
+        preloadAnimationPackage();
 
         mSreamerEventHandler = new StreamerEventHandler(this);
 
@@ -205,6 +215,7 @@ public class UpActivity2 extends BaseActivity implements ILangCameraStreamer.ILa
         else
             mBeauty.setText("美颜/" + mBeautyWhich);
 
+        //mCameraStreamer.enablePureAudio(true);
         mCameraStreamer.startPreview();
 
         String rtmpUrl = getIntent().getStringExtra("rtmp_url");
@@ -239,6 +250,12 @@ public class UpActivity2 extends BaseActivity implements ILangCameraStreamer.ILa
                 break;
             case R.id.up2_show_debug_view:
                 toggleDebugView();
+                break;
+            case R.id.up2_beauty_hair:
+                changeBeautyhair();
+                break;
+            case R.id.up2_gift_animation:
+                changeGiftAnimation();
                 break;
             case R.id.up2_switch_camera:
                 changeCamera();
@@ -306,6 +323,9 @@ public class UpActivity2 extends BaseActivity implements ILangCameraStreamer.ILa
             case LANG_ERROR_RECORD_FAIL:
                 // check result error code.
                 setErrorInfoText(String.format(Locale.getDefault(),"local record failed with result %d", i), Color.RED);
+                break;
+            case LANG_ERROR_LOAD_ANIMATON_FAIL:
+                setErrorInfoText("animation loading failed", Color.RED);
                 break;
         }
     }
@@ -381,6 +401,26 @@ public class UpActivity2 extends BaseActivity implements ILangCameraStreamer.ILa
                 int uid = what;
                 doRemoveRemoteUi(uid);
                 updateRtcMessageText(String.format("连麦: 用户(0x%x)离开房间", uid));
+                break;
+            }
+            case LANG_EVENT_ANIMATION_LOADING: {
+                int progress = what;
+                updateAnimationStatusText(String.format(Locale.getDefault(),
+                        "动画: 加载进度%d%%", progress));
+                break;
+            }
+            case LANG_EVENT_ANIMATION_LOAD_SUCC: {
+                updateAnimationStatusText("动画: 加载成功");
+                break;
+            }
+            case LANG_EVENT_ANIMATION_PLAYING: {
+                int frameIndex = what;
+                updateAnimationStatusText(String.format(Locale.getDefault(),
+                        "动画: %d frames", frameIndex));
+                break;
+            }
+            case LANG_EVENT_ANIMATION_PLAY_END: {
+                updateAnimationStatusText("动画: 播放完毕");
                 break;
             }
         }
@@ -516,6 +556,15 @@ public class UpActivity2 extends BaseActivity implements ILangCameraStreamer.ILa
         });
     }
 
+    private void updateAnimationStatusText(final String text) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                mAnimationMessageTextView.setText(text);
+            }
+        });
+    }
+
     private FrameLayout currentAvailableLayout() {
         if (mRemoteContainer1.getChildCount() < 1)
             return mRemoteContainer1;
@@ -634,6 +683,42 @@ public class UpActivity2 extends BaseActivity implements ILangCameraStreamer.ILa
         } else {
             mDebugLinear.setVisibility(View.INVISIBLE);
         }
+    }
+
+    private boolean showBeautyHair = false;
+    private void changeBeautyhair() {
+        showBeautyHair = !showBeautyHair;
+        if (showBeautyHair) {
+            mBeautyHairConfig.setStartColor(0xFFB92B27);
+            mBeautyHairConfig.setEndColor(0xFFB92B27);
+            mBeautyHairConfig.setEnable(true);
+        } else {
+            mBeautyHairConfig.setEnable(false);
+        }
+        mCameraStreamer.setHairColors(mBeautyHairConfig);
+    }
+
+    private void changeGiftAnimation() {
+        new AlertDialog.Builder(this).setTitle("choose animation")
+                .setSingleChoiceItems(mGiftAnimations, mAnimationWhich,
+                        new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int which) {
+                                if (mAnimationWhich != which) {
+                                    mAnimationWhich = which;
+                                    if (which == 0) {
+                                        mAnimationConfig.enable = false;
+                                        mAnimationConfig.animationPath = null;
+                                    }
+                                    else {
+                                        mAnimationConfig.enable = true;
+                                        mAnimationConfig.animationPath = mAnimationsList.get(which-1);
+                                    }
+                                    mCameraStreamer.setMattingAnimation(mAnimationConfig);
+
+                                }
+                                dialog.dismiss();
+                            }
+                        }).setNegativeButton("取消", null).show();
     }
 
     private void changeCamera() {
@@ -933,6 +1018,12 @@ public class UpActivity2 extends BaseActivity implements ILangCameraStreamer.ILa
             streamerConfig.videoResolution = ILangCameraStreamer.LangVideoResolution.LANG_VIDEO_RESOLUTION_360P;
         }
 
+        if(getIntent().getBooleanExtra("open_hardware_speedup",true)){
+            streamerConfig.videoEncoderType = ILangCameraStreamer.LangVideoEncoderType.LANG_VIDEO_ENCODER_HARDWARE;
+        }else {
+            streamerConfig.videoEncoderType = ILangCameraStreamer.LangVideoEncoderType.LANG_VIDEO_ENCODER_OPENH264;
+        }
+
         return streamerConfig;
     }
 
@@ -960,21 +1051,32 @@ public class UpActivity2 extends BaseActivity implements ILangCameraStreamer.ILa
 
     private void preloadStickerPackage() {
         for (int index = 1; index < mSenseMeStickers.length; index++) {
-            String stickerDir = "senseme_sticker";
+            String stickerSrcDir = "senseme_sticker";
+            String stickerDstDir = "/LangLive/langARStickers";
             String stickerName = mSenseMeStickers[index] + ".zip";
-            String stickerReadablePath = saveAssestsData(this, stickerDir, stickerName);
+            String stickerReadablePath = saveAssestsData(this, stickerSrcDir, stickerDstDir, stickerName);
             mFaceuStickersList.add(stickerReadablePath);
         }
     }
 
-    static String saveAssestsData(Context context, String filePath, String name) {
+    private void preloadAnimationPackage() {
+        for (int index = 1; index < mGiftAnimations.length; index++) {
+            String animSrcDir = "webp";
+            String animDstDir = "/LangLive/langAnimations";
+            String animName = mGiftAnimations[index];
+            String animReadablePath = saveAssestsData(this, animSrcDir, animDstDir, animName);
+            mAnimationsList.add(animReadablePath);
+        }
+    }
+
+    static String saveAssestsData(Context context, String srcfilePath, String dstPath, String name) {
         InputStream inputStream;
         try {
-            inputStream = context.getResources().getAssets().open(filePath + "/" + name);
+            inputStream = context.getResources().getAssets().open(srcfilePath + "/" + name);
 
 //            File file = context.getExternalFilesDir("beautify");
 //			File file = context.getCacheDir();
-			File file = new File(Environment.getExternalStorageDirectory() + "/LangLive/langARStickers");
+			File file = new File(Environment.getExternalStorageDirectory() + dstPath);
 //            File file = new File("/sdcard/tempdir");
             if (!file.exists()) {
                 file.mkdirs();

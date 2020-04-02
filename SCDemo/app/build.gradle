@@ -92,10 +92,12 @@ dependencies {
     implementation 'io.reactivex:rxjava:1.1.6'
     //implementation project(':LangStreamer1Kit')
     //implementation project(':LangStreamer2Kit')
-    implementation files('libs/LangStreamer1kit_1.9.0.aar')
-    implementation files('libs/LangStreamer2kit_0.9.1.aar')
+    implementation files('libs/LangStreamer1kit_1.9.1.aar')
+    implementation files('libs/LangStreamer2kit_1.0.0.aar')
+    implementation files('libs/LangGPUImageLib_2.0.7.aar')
+    implementation files('libs/LangImageAnimLib_1.0.1.aar')
+    implementation files('libs/LangAIKit_1.1.2.aar')
     implementation files('libs/AgoraRTCLib_1.0.3.aar')
-    implementation files('libs/LangGPUImageLib_2.0.2.aar')
     implementation files('libs/SenseMeLibrary_1.0.11.aar')
     implementation files('libs/yfGraphicBuffer_1.0.5.aar')
 }

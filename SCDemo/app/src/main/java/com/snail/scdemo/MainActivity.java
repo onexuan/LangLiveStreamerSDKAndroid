@@ -87,7 +87,8 @@ public class MainActivity extends BaseActivity {
             }
         });
 
-        mLiveUrl.setText("rtmp://172.16.16.213/live/8");
+        mLiveUrl.setText("rtmp://vid-218.push.chinanetcenter.broadcastapp.agora.io/live/langlive-test");
+        //mLiveUrl.setText("rtmp://172.16.16.213/live/8");
 
         ArrayList<String> rtcConfList = new ArrayList<>();
         rtcConfList.add("320x240/15fps/200kbps");

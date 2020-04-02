@@ -69,17 +69,6 @@
                 android:layout_toStartOf="@+id/up2_switch_camera" />
 
             <Button
-                android:id="@+id/up2_show_debug_view"
-                android:layout_width="50dp"
-                android:layout_height="wrap_content"
-                android:layout_marginRight="0dp"
-                android:text="信息"
-                android:textColor="#000"
-                android:textSize="12sp"
-                android:layout_alignParentTop="true"
-                android:layout_toStartOf="@+id/up2_switch_orientation" />
-
-            <Button
                 android:id="@+id/up2_gift_animation"
                 android:layout_width="50dp"
                 android:layout_height="wrap_content"
@@ -88,7 +77,7 @@
                 android:textColor="#000"
                 android:textSize="12sp"
                 android:layout_alignParentTop="true"
-                android:layout_toStartOf="@+id/up2_show_debug_view" />
+                android:layout_toStartOf="@+id/up2_switch_orientation" />
 
             <Button
                 android:id="@+id/up2_beauty_hair"
@@ -101,6 +90,16 @@
                 android:layout_alignParentTop="true"
                 android:layout_toStartOf="@+id/up2_gift_animation" />
 
+            <Button
+                android:id="@+id/up2_show_debug_view"
+                android:layout_width="50dp"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="0dp"
+                android:text="信息"
+                android:textColor="#000"
+                android:textSize="12sp"
+                android:layout_alignParentTop="true"
+                android:layout_toStartOf="@+id/up2_beauty_hair" />
 
         </RelativeLayout>
     </LinearLayout>
@@ -410,6 +409,13 @@
 
         <TextView
             android:id="@+id/up2_recordMessageDebug"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#ffffffff"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/up2_animationMessageDebug"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textColor="#ffffffff"

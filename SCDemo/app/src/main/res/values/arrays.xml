@@ -92,4 +92,11 @@
 <!--        <item>beauty</item>-->
     </string-array>
 
+    <string-array name="gift_animations">
+        <item>none</item>
+        <item>光斑_19068MS.webp</item>
+        <item>實底_7056MS.webp</item>
+        <item>金色_15120MS.webp</item>
+    </string-array>
+
 </resources>
