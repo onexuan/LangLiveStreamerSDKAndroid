@@ -39,6 +39,10 @@ public class MagicSoftlightBlendFilter extends GPUImageFilter {
         this.maskTextureBuffer = maskTextureBuffer;
     }
 
+    public void setSaturation(float saturation) {
+        setFloat(saturationLocation, saturation);
+    }
+
     public void setBlurSize(float blurSize) {
         this.blurSize = blurSize;
         initTexelOffsets(mIntputWidth, mIntputHeight);
