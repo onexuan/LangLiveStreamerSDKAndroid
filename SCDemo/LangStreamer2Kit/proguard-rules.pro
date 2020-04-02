@@ -31,4 +31,5 @@
 -keep public class net.lang.streamer2.LangStreamerVersion{*;}
 -keep class net.lang.streamer2.config.** {*;}
 #keep native jni reference class
+-keep public class net.lang.streamer2.engine.encoder.LangOpenh264Encoder{*;}
 -keep public class net.lang.streamer2.engine.publish.LangRtmpMuxer{*;}

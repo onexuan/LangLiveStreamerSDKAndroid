@@ -6,6 +6,9 @@ import android.opengl.GLES20;
 
 import com.yunfan.graphicbuffer.GraphicBufferWrapper;
 
+import net.lang.gpuimage.filter.custom.AIBeautyHairFilter;
+import net.lang.gpuimage.filter.custom.IAnimationStatusListener;
+import net.lang.gpuimage.filter.custom.AIMattingFilter;
 import net.lang.gpuimage.filter.custom.MagicWaterMarkFilter;
 import net.lang.gpuimage.filter.base.MagicCameraInputFilter;
 import net.lang.gpuimage.filter.base.gpuimage.GPUImageFilter;
@@ -14,6 +17,8 @@ import net.lang.gpuimage.helper.MagicFilterType;
 import net.lang.gpuimage.utils.Rotation;
 import net.lang.gpuimage.utils.TextureRotationUtil;
 
+import net.lang.streamer2.config.LangAnimationConfig;
+import net.lang.streamer2.config.LangBeautyhairConfig;
 import net.lang.streamer2.config.LangFaceuConfig;
 import net.lang.streamer2.config.LangWatermarkConfig;
 
@@ -53,7 +58,12 @@ public class LangEffectRenderer extends LangBaseRenderer {
     private MagicWaterMarkFilter mWaterMarkFilter;
     private GPUImageFilter mBeautyFilter, mEffectFilter;
     private SenseMEFilter.FaceuConfig mInternalFaceuConfig = null;
-    private SenseMEFilter mFaceTracker = null;
+    private SenseMEFilter mFaceTracker;
+
+    private boolean mBeautyHairEnabled;
+    private AIBeautyHairFilter mBeautyHairTracker;
+    private boolean mMattingEnabled;
+    private AIMattingFilter mMattingTracker;
 
     private GraphicBufferWrapper mGraphicBuffer = null;
     private TextureUtils mSwapTexture1 = null;
@@ -225,6 +235,38 @@ public class LangEffectRenderer extends LangBaseRenderer {
         });
     }
 
+    public final void updateBeautyHairConfig(final LangBeautyhairConfig config) {
+        queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                if (config != null) {
+                    mBeautyHairEnabled = config.enable();
+                    mBeautyHairTracker.setBeautyHairConfig(config.getStartColor(),
+                            config.getEndColor(), config.getSaturation());
+                } else
+                    mBeautyHairEnabled = false;
+            }
+        });
+    }
+
+    public final void updateMattingConfig(final LangAnimationConfig config, final IAnimationStatusListener listener) {
+        queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                if (config != null) {
+                    mMattingEnabled = config.enable;
+                    if (mMattingEnabled) {
+                        mMattingTracker.setAnimationData(config.animationPath);
+                        mMattingTracker.setAnimationCallback(listener);
+                    }
+                } else {
+                    mMattingEnabled = false;
+                    mMattingTracker.setAnimationCallback(null);
+                }
+            }
+        });
+    }
+
     private void setFaceuConfig(final LangFaceuConfig config) {
         mInternalFaceuConfig.enableBeauty = config.needBeautify;
         mInternalFaceuConfig.enableBodyBeauty = config.needBodyBeautify;
@@ -254,6 +296,11 @@ public class LangEffectRenderer extends LangBaseRenderer {
         mInternalFaceuConfig = new SenseMEFilter.FaceuConfig();
         mInternalFaceuConfig.defaultBeautyParams();
         mFaceTracker = new SenseMEFilter(context);
+
+        mBeautyHairEnabled = false;
+        mBeautyHairTracker = AIBeautyHairFilter.createInstance(context);
+        mMattingEnabled = false;
+        mMattingTracker = AIMattingFilter.createInstance(context);
 
         mSwapTexture1 = new TextureUtils();
         mSwapTexture2 = new TextureUtils();
@@ -292,6 +339,10 @@ public class LangEffectRenderer extends LangBaseRenderer {
 
         mFaceTracker.init();
 
+        mBeautyHairTracker.init();
+
+        mMattingTracker.init();
+
         mOutputFilter.init();
 
         if (mListener != null) {
@@ -322,6 +373,16 @@ public class LangEffectRenderer extends LangBaseRenderer {
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, outputFrameBufferId);
         mCameraInputFilter.onDrawFrame(inputTextureId, gLCubeBuffer, gLCameraTextureBuffer);
         inputTextureId = mSwapTexture1.textureID();
+
+        // process beauty hair
+        if (mBeautyHairEnabled) {
+            inputTextureId = mBeautyHairTracker.onDrawFrame(inputTextureId);
+        }
+
+        // process matting
+        if (mMattingEnabled) {
+            inputTextureId = mMattingTracker.onDrawFrame(inputTextureId);
+        }
 
         // process faceu
         inputTextureId = mFaceTracker.onDrawFrame(inputTextureId);
@@ -372,6 +433,9 @@ public class LangEffectRenderer extends LangBaseRenderer {
         if (inputSizeChanged) {
 
             mFaceTracker.onInputSizeChanged(imageWidth, imageHeight);
+
+            mBeautyHairTracker.onInputSizeChanged(imageWidth, imageHeight);
+            mMattingTracker.onInputSizeChanged(imageWidth, imageHeight);
 
             mSwapTexture1.initTexture_l(imageWidth, imageHeight);
             mSwapTexture2.initTexture_l(imageWidth, imageHeight);
@@ -435,6 +499,16 @@ public class LangEffectRenderer extends LangBaseRenderer {
         if (mFaceTracker != null) {
             mFaceTracker.destroy();
             mFaceTracker = null;
+        }
+
+        if (mBeautyHairTracker != null) {
+            mBeautyHairTracker.destroy();
+            mBeautyHairTracker = null;
+        }
+
+        if (mMattingTracker != null) {
+            mMattingTracker.destroy();
+            mMattingTracker = null;
         }
 
         if (mGraphicBuffer != null) {

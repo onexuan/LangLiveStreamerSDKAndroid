@@ -1,5 +1,6 @@
 package net.lang.streamer2.engine.session;
 
+import android.content.Context;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo.CodecCapabilities;
 import android.opengl.GLSurfaceView;
@@ -8,16 +9,21 @@ import android.view.SurfaceView;
 
 import com.yunfan.graphicbuffer.GraphicBufferWrapper;
 
+import net.lang.gpuimage.filter.custom.IAnimationStatusListener;
 import net.lang.gpuimage.helper.MagicFilterType;
 import net.lang.streamer2.LangRtcInfo;
 import net.lang.streamer2.LangRtcUser;
+import net.lang.streamer2.config.LangAnimationConfig;
+import net.lang.streamer2.config.LangBeautyhairConfig;
 import net.lang.streamer2.config.LangFaceuConfig;
-import net.lang.streamer2.config.LangObjectSegmentationConfig;
 import net.lang.streamer2.config.LangRtcConfig;
 import net.lang.streamer2.config.LangWatermarkConfig;
 import net.lang.streamer2.engine.capture.CaptureRuntimeException;
+import net.lang.streamer2.engine.capture.IBaseVideoCapture;
 import net.lang.streamer2.engine.capture.LangAudioCapture;
+import net.lang.streamer2.engine.capture.LangImageCapture;
 import net.lang.streamer2.engine.capture.LangVideoCapture;
+import net.lang.streamer2.engine.data.LangAnimationStatus;
 import net.lang.streamer2.engine.data.LangAudioConfiguration;
 import net.lang.streamer2.engine.data.LangFrameStatistics;
 import net.lang.streamer2.engine.data.LangMediaBuffer;
@@ -41,20 +47,22 @@ import net.lang.streamer2.rtc.IRTCSessionListener;
 import net.lang.streamer2.rtc.RTCControllerFactory;
 import net.lang.streamer2.utils.DebugLog;
 
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 
 public final class LangMediaSession implements
         LangAudioCapture.LangAudioCaptureListener,
-        LangVideoCapture.LangVideoCaptureListener,
+        IBaseVideoCapture.IVideoCaptureListener,
         IBaseAudioEncoder.IAudioEncoderListener,
         IBaseVideoEncoder.IVideoEncoderListener,
         INetworkListener,
         IRecordListener,
         IFaceuListener,
+        IAnimationStatusListener,
         IRTCSessionListener
 {
     private static final String TAG = LangMediaSession.class.getSimpleName();
+
+    private Context mContext;
 
     private LangMediaSessionHandler mEventHandler;
 
@@ -62,6 +70,7 @@ public final class LangMediaSession implements
     private LangVideoConfiguration mVideoConfiguration;
 
     private LangAudioCapture mAudioCaptureSource;
+    private LangImageCapture mImageCaptureSource;
     private LangVideoCapture mVideoCaptureSource;
     private IBaseAudioEncoder mAudioEncoder;
     private IBaseVideoEncoder mVideoEncoder;
@@ -93,53 +102,61 @@ public final class LangMediaSession implements
 
     private boolean mAdaptiveBitrate = false;
 
+    private boolean mEnablePureAudio = false;
+
     public LangMediaSession(LangAudioConfiguration audioConfiguration, LangVideoConfiguration videoConfiguration)
         throws CaptureRuntimeException, EncoderRuntimeException {
 
-        mAudioConfiguration = audioConfiguration;
-        mVideoConfiguration = videoConfiguration;
-
-        // create audio/video source
-        mAudioCaptureSource = new LangAudioCapture(mAudioConfiguration);
+        // create audio source
+        mAudioCaptureSource = new LangAudioCapture(audioConfiguration);
         mAudioCaptureSource.setCaptureListener(this);
 
-        mVideoCaptureSource = new LangVideoCapture(mVideoConfiguration);
-        mVideoCaptureSource.setCaptureListener(this);
-        mVideoCaptureSource.setFaceuListener(this);
-
-        // create audio/video encoder transform.
-        mAudioEncoder = LangAudioEncoderFactory.create(mAudioConfiguration);
+        // create audio encoder transform.
+        mAudioEncoder = LangAudioEncoderFactory.create(audioConfiguration);
         mAudioEncoder.setEncodeListener(this);
 
-        mVideoEncoder = LangVideoEncoderFactory.create(mVideoConfiguration);
+        // create video source
+        mVideoCaptureSource = new LangVideoCapture(videoConfiguration);
+        mVideoCaptureSource.setCaptureListener(this);
+
+        // create image source
+        mImageCaptureSource = new LangImageCapture(videoConfiguration);
+        mImageCaptureSource.setCaptureListener(this);
+
+        // create video encoder transform
+        mVideoEncoder = LangVideoEncoderFactory.create(videoConfiguration);
         mVideoEncoder.setEncodeListener(this);
 
+        // create video capture buffer queue for sharing between capture and encoder
+        int videoDataCapacity = videoConfiguration.getWidth() * videoConfiguration.getHeight() * 3 / 2;
+        mCapturedVideoQueue = new RecyclableBufferQueue(videoDataCapacity);
+
         // create socket media sink
-        mSocketPublisher = new LangRtmpPublisher(mAudioConfiguration, mVideoConfiguration);
+        mSocketPublisher = new LangRtmpPublisher(audioConfiguration, videoConfiguration);
         mSocketPublisher.setNetworkListener(this);
 
         // create local media sink
-        mFilePublisher = new LangLocalPublisher(mAudioConfiguration, mVideoConfiguration);
+        mFilePublisher = new LangLocalPublisher(audioConfiguration, videoConfiguration);
         mFilePublisher.setRecordListener(this);
 
-        int videoDataCapacity = mVideoConfiguration.getWidth() * mVideoConfiguration.getHeight() * 3 / 2;
-        mCapturedVideoQueue = new RecyclableBufferQueue(videoDataCapacity);
-
         mEventHandler = new LangMediaSessionHandler();
+
+        mAudioConfiguration = audioConfiguration;
+        mVideoConfiguration = videoConfiguration;
     }
 
     // release media session
     public void release() {
         mAudioCaptureSource.release();
         mVideoCaptureSource.release();
+        mImageCaptureSource.release();
 
         mSocketPublisher.release();
         mFilePublisher.release();
 
-        if (mEventHandler != null) {
-            mEventHandler.removeCallbacksAndMessages(null);
-            mEventHandler = null;
-        }
+        mEventHandler.removeCallbacksAndMessages(null);
+        mEventHandler = null;
+        mContext = null;
         DebugLog.i(TAG, "session resource release");
     }
 
@@ -149,38 +166,56 @@ public final class LangMediaSession implements
 
     public void setSurfaceView(GLSurfaceView glSurfaceView) {
         mVideoCaptureSource.setSurfaceView(glSurfaceView);
+        mVideoCaptureSource.setFaceuListener(this);
+        mContext = glSurfaceView.getContext();
     }
 
     public GLSurfaceView getSurfaceView() {
         return mVideoCaptureSource.getSurfaceView();
     }
 
+    public void enablePureAudio(boolean pureAudio) {
+        mEnablePureAudio = pureAudio;
+    }
+
     public void setRunning(boolean start) {
         if (start) {
+            // start audio components
+            mAudioEncoder.start();
+            mAudioCaptureSource.start();
+
+            // start video components
             mCapturedVideoQueue.reset();
 
             mVideoThread = new VideoEncodeThread();
-            //mVideoThread.setName("VideoEncodeThread");
             mVideoThread.start();
 
-            mAudioEncoder.start();
             mVideoEncoder.start();
-            mAudioCaptureSource.start();
-            mVideoCaptureSource.start();
+            if (mEnablePureAudio) {
+                mImageCaptureSource.start();
+            } else {
+                mVideoCaptureSource.start();
+            }
             DebugLog.d(TAG, "audio video components are running");
 
             // create rtc controller.
-            mRtcController = RTCControllerFactory.create(getSurfaceView().getContext(), RTCControllerFactory.RtcImplType.kAgora);
+            mRtcController = RTCControllerFactory.create(mContext, RTCControllerFactory.RtcImplType.kAgora);
             mRtcController.initialize();
             mRtcController.setListener(this);
             DebugLog.d(TAG, "rtc controller is initialized");
 
         } else {
+            // stop audio components
             mAudioEncoder.stop();
-            mVideoEncoder.stop();
             mAudioCaptureSource.stop();
-            mVideoCaptureSource.stop();
 
+            // stop video components
+            mVideoEncoder.stop();
+            if (mEnablePureAudio) {
+                mImageCaptureSource.stop();
+            } else {
+                mVideoCaptureSource.stop();
+            }
             mVideoThread.quit();
             try {
                 mVideoThread.join();
@@ -255,14 +290,14 @@ public final class LangMediaSession implements
         mVideoCaptureSource.updateFaceuConfig(config);
     }
 
-    public void setGiftAnimation(LangObjectSegmentationConfig params, InputStream inputStream, InputStream giftStream) {
-        DebugLog.d(TAG, "setGiftAnimation");
-        mVideoCaptureSource.updateMattingConfig(params, inputStream, giftStream);
+    public void setMattingAnimation(LangAnimationConfig config) {
+        DebugLog.d(TAG, "setMattingAnimation");
+        mVideoCaptureSource.updateMattingConfig(config, this);
     }
 
-    public void setHairColors(LangObjectSegmentationConfig params) {
+    public void setHairColors(LangBeautyhairConfig config) {
         DebugLog.d(TAG, "setHairColors");
-        mVideoCaptureSource.updateBeautyHairConfig(params);
+        mVideoCaptureSource.updateBeautyHairConfig(config);
     }
 
     public void enableMakeups(boolean enable) {
@@ -394,7 +429,7 @@ public final class LangMediaSession implements
         }
     }
 
-    // implement LangVideoCapture.LangVideoCaptureListener
+    // implement IBaseVideoCapture.IVideoCaptureListener
     @Override
     public boolean skip(long timens) {
         return false;
@@ -420,6 +455,14 @@ public final class LangMediaSession implements
     }
 
     @Override
+    public void onCapturedImageFrame(byte[] i420Frame, int width, int height, long timestampNs) {
+        if (mRtmpUploading) {
+            encodeVideoBuffer(i420Frame, width, height, timestampNs);
+        }
+    }
+
+    // implement IFaceuListener
+    @Override
     public void onHumanFaceDetected(int faceCount) {
         // post event to UI thread
         if (mEventHandler != null) {
@@ -432,6 +475,48 @@ public final class LangMediaSession implements
         // post event to UI thread
         if (mEventHandler != null) {
             mEventHandler.notifyFaceTrackerHandUpdate(handCount, gesture);
+        }
+    }
+
+    // implement IAnimationStatusListener
+    @Override
+    public void onAnimationDecoding(String animPath, float progressPercentage) {
+        // post event to UI thread
+        if (mEventHandler != null) {
+            int progress = (int)(progressPercentage * 100.f);
+            mEventHandler.notifyAnimationStatusChanged(LangAnimationStatus.LANG_ANIMATION_STATUS_DECODING, progress);
+        }
+    }
+
+    @Override
+    public void onAnimationDecodeSuccess(String animPath) {
+        // post event to UI thread
+        if (mEventHandler != null) {
+            mEventHandler.notifyAnimationStatusChanged(LangAnimationStatus.LANG_ANIMATION_STATUS_READY, 0);
+        }
+    }
+
+    @Override
+    public void onAnimationDecodeError(String animPath) {
+        // post event to UI thread
+        if (mEventHandler != null) {
+            mEventHandler.notifyAnimationStatusChanged(LangAnimationStatus.LANG_ANIMATION_STATUS_ERROR, -1);
+        }
+    }
+
+    @Override
+    public void onAnimationPlaying(String animPath, int frameIndex) {
+        // post event to UI thread
+        if (mEventHandler != null) {
+            mEventHandler.notifyAnimationStatusChanged(LangAnimationStatus.LANG_ANIMATION_STATUS_PLAY, frameIndex);
+        }
+    }
+
+    @Override
+    public void onAnimationPlayFinish(String animPath) {
+        // post event to UI thread
+        if (mEventHandler != null) {
+            mEventHandler.notifyAnimationStatusChanged(LangAnimationStatus.LANG_ANIMATION_STATUS_COMPLETE, 0);
         }
     }
 
@@ -802,13 +887,32 @@ public final class LangMediaSession implements
         }
     }
 
+    private void encodeVideoBuffer(byte[] i420Frame, int width, int height, long timestampNs) {
+        synchronized (mVideoQueueLock) {
+            LangMediaBuffer mediaBuffer = mCapturedVideoQueue.dequeueEmptyBuffer();
+            if (mediaBuffer == null) {
+                DebugLog.w(TAG, "no empty buffer now, maybe encoder has low performence");
+                return;
+            }
+
+            if (mVideoEncoder.getEncoderFormat() == CodecCapabilities.COLOR_FormatYUV420Planar) {
+                byte[] copyFrame = mediaBuffer.data();
+                System.arraycopy(i420Frame, 0, copyFrame, 0, i420Frame.length);
+            } else if (mVideoEncoder.getEncoderFormat() == CodecCapabilities.COLOR_FormatYUV420SemiPlanar) {
+                byte[] nv12Frame = mediaBuffer.data();
+                System.arraycopy(i420Frame, 0, nv12Frame, 0, i420Frame.length);
+            }
+
+            mediaBuffer.setDataLength(width * height * 3/2);
+            mediaBuffer.setPresentationTimeUs(timestampNs/1000L);
+
+            mCapturedVideoQueue.queueEmptyBuffer();
+            mVideoQueueLock.notifyAll();
+        }
+    }
 
     private boolean rtmpAudioVideoAlignment() {
-        if (mRtmpHasCapturedAudio && mRtmpHasKeyFrameVideo) {
-            return true;
-        } else {
-            return false;
-        }
+        return mRtmpHasCapturedAudio && mRtmpHasKeyFrameVideo;
     }
 
     private long rtmpUploadTimestamp(long presentationTimeUs) {
@@ -832,11 +936,7 @@ public final class LangMediaSession implements
     }
 
     private boolean localAudioVideoAlignment() {
-        if (mLocalHasCapturedAudio && mLocalHasKeyFrameVideo) {
-            return true;
-        } else {
-            return false;
-        }
+        return mLocalHasCapturedAudio && mLocalHasKeyFrameVideo;
     }
 
     private long localUploadTimestamp(long presentationTimeUs) {

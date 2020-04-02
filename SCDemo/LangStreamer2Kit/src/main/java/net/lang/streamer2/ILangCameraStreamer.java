@@ -3,8 +3,9 @@ package net.lang.streamer2;
 import android.opengl.GLSurfaceView;
 import android.view.SurfaceView;
 
+import net.lang.streamer2.config.LangAnimationConfig;
+import net.lang.streamer2.config.LangBeautyhairConfig;
 import net.lang.streamer2.config.LangFaceuConfig;
-import net.lang.streamer2.config.LangObjectSegmentationConfig;
 import net.lang.streamer2.config.LangRtcConfig;
 import net.lang.streamer2.config.LangStreamerConfig;
 import net.lang.streamer2.config.LangWatermarkConfig;
@@ -51,7 +52,12 @@ public interface ILangCameraStreamer {
         LANG_EVENT_RTC_NETWORK_LOST         (5011, "LANG_EVENT_RTC_NETWORK_LOST"),
         LANG_EVENT_RTC_NETWORK_TIMEOUT      (5012, "LANG_EVENT_RTC_NETWORK_TIMEOUT"),
 
-        LANG_WARNNING_HW_ACCELERATION_FAIL  (6002, "LANG_WARNNING_HW_ACCELERATION_FAIL");
+        LANG_EVENT_ANIMATION_LOADING        (6000, "LANG_EVENT_ANIMATION_LOADING"),
+        LANG_EVENT_ANIMATION_LOAD_SUCC      (6001, "LANG_EVENT_ANIMATION_LOAD_SUCC"),
+        LANG_EVENT_ANIMATION_PLAYING        (6002, "LANG_EVENT_ANIMATION_PLAYING"),
+        LANG_EVENT_ANIMATION_PLAY_END       (6003, "LANG_EVENT_ANIMATION_PLAY_END"),
+
+        LANG_WARNNING_HW_ACCELERATION_FAIL  (8000, "LANG_WARNNING_HW_ACCELERATION_FAIL");
 
         int value;
         String name;
@@ -62,17 +68,18 @@ public interface ILangCameraStreamer {
     }
 
     enum LangStreamerError {
-        LANG_ERROR_OPEN_CAMERA_FAIL     (3001, "LANG_ERROR_OPEN_CAMERA_FAIL"),
-        LANG_ERROR_OPEN_MIC_FAIL        (3002, "LANG_ERROR_OPEN_MIC_FAIL"),
-        LANG_ERROR_VIDEO_ENCODE_FAIL    (3003, "LANG_ERROR_VIDEO_ENCODE_FAIL"),
-        LANG_ERROR_AUDIO_ENCODE_FAIL    (3004, "LANG_ERROR_AUDIO_ENCODE_FAIL"),
-        LANG_ERROR_PUSH_CONNECT_FAIL    (3005, "LANG_ERROR_PUSH_CONNECT_FAIL"),
-        LANG_ERROR_RECORD_FAIL          (3006, "LANG_ERROR_RECORD_FAIL"),
-        LANG_ERROR_SCREENSHOT_FAIL      (3007, "LANG_ERROR_SCREENSHOT_FAIL"),
-        LANG_ERROR_UNSUPPORTED_FORMAT   (3008, "LANG_ERROR_UNSUPPORTED_FORMAT"),
-        LANG_ERROR_NO_PERMISSIONS       (3009, "LANG_ERROR_NO_PERMISSIONS"),
-        LANG_ERROR_AUTH_FAIL            (3010, "LANG_ERROR_AUTH_FAIL"),
-        LANG_ERROR_RTC_EXCEPTION        (3020, "LANG_ERROR_RTC_EXCEPTION");
+        LANG_ERROR_OPEN_CAMERA_FAIL     (10001, "LANG_ERROR_OPEN_CAMERA_FAIL"),
+        LANG_ERROR_OPEN_MIC_FAIL        (10002, "LANG_ERROR_OPEN_MIC_FAIL"),
+        LANG_ERROR_VIDEO_ENCODE_FAIL    (10003, "LANG_ERROR_VIDEO_ENCODE_FAIL"),
+        LANG_ERROR_AUDIO_ENCODE_FAIL    (10004, "LANG_ERROR_AUDIO_ENCODE_FAIL"),
+        LANG_ERROR_PUSH_CONNECT_FAIL    (10005, "LANG_ERROR_PUSH_CONNECT_FAIL"),
+        LANG_ERROR_RECORD_FAIL          (10006, "LANG_ERROR_RECORD_FAIL"),
+        LANG_ERROR_SCREENSHOT_FAIL      (10007, "LANG_ERROR_SCREENSHOT_FAIL"),
+        LANG_ERROR_UNSUPPORTED_FORMAT   (10008, "LANG_ERROR_UNSUPPORTED_FORMAT"),
+        LANG_ERROR_NO_PERMISSIONS       (10009, "LANG_ERROR_NO_PERMISSIONS"),
+        LANG_ERROR_AUTH_FAIL            (10010, "LANG_ERROR_AUTH_FAIL"),
+        LANG_ERROR_RTC_EXCEPTION        (10011, "LANG_ERROR_RTC_EXCEPTION"),
+        LANG_ERROR_LOAD_ANIMATON_FAIL   (10012, "LANG_ERROR_LOAD_ANIMATON_FAIL");
         int value;
         String name;
         LangStreamerError(int v, String string) {
@@ -169,6 +176,21 @@ public interface ILangCameraStreamer {
         }
     }
 
+    enum LangAudioEncoderType {
+        LANG_AUDIO_ENCODER_HARDWARE(0),
+        LANG_AUDIO_ENCODER_FAAC(1), //not supported yet
+        LANG_AUDIO_ENCODER_DEFAULT(LANG_AUDIO_ENCODER_HARDWARE.getValue());
+
+        private int value;
+        LangAudioEncoderType(int v) {
+            value = v;
+        }
+
+        int getValue() {
+            return value;
+        }
+    }
+
     enum LangVideoResolution {
         LANG_VIDEO_RESOLUTION_360P(0),
         LANG_VIDEO_RESOLUTION_480P(1),
@@ -198,6 +220,21 @@ public interface ILangCameraStreamer {
         LANG_VIDEO_QUALITY_DEFAULT(LANG_VIDEO_QUALITY_LOW_2.getValue());
         private int value;
         LangVideoQuality(int v) {
+            value = v;
+        }
+
+        int getValue() {
+            return value;
+        }
+    }
+
+    enum LangVideoEncoderType {
+        LANG_VIDEO_ENCODER_HARDWARE(0),
+        LANG_VIDEO_ENCODER_OPENH264(1),
+        LANG_VIDEO_ENCODER_X264(2),   //not supported yet
+        LANG_VIDEO_ENCODER_DEFAULT(LANG_VIDEO_ENCODER_HARDWARE.getValue());
+        private int value;
+        LangVideoEncoderType(int v) {
             value = v;
         }
 
@@ -247,6 +284,9 @@ public interface ILangCameraStreamer {
     void onResume();
     void onPause();
 
+    //纯音频推流(不采集摄像头数据)
+    void enablePureAudio(boolean pureAudio);
+
     //预览控制
     int startPreview();
     int stopPreview();
@@ -263,6 +303,7 @@ public interface ILangCameraStreamer {
     void setAutoAdjustBitrate(boolean enable);
 
     //获取实时推流信息
+    @Deprecated
     LangRtmpInfo getLiveInfo();
 
     //录制控制
@@ -288,8 +329,8 @@ public interface ILangCameraStreamer {
     void enableMakeups(boolean enable);
 
     // 禮物動畫，美髮等(Object segmentation相關)
-    int setGiftAnimation(LangObjectSegmentationConfig params, InputStream inputStream, InputStream giftStream);
-    int setHairColors(LangObjectSegmentationConfig params);
+    int setMattingAnimation(LangAnimationConfig config);
+    int setHairColors(LangBeautyhairConfig config);
 
     //静音
     int setMute(boolean mute);

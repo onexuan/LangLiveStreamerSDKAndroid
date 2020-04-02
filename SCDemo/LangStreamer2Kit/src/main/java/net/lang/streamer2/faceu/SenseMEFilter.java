@@ -82,7 +82,7 @@ public class SenseMEFilter extends GPUImageFilter {
     private boolean mNeedBeautify = false;
     private boolean mNeedBodyBeautify = false;
     private boolean mNeedFaceAttribute = false;
-    private boolean mNeedSticker = false;;
+    private boolean mNeedSticker = false;
 
     private static float[] mBeautifyParams = {0.36f, 0.74f, 0.02f, 0.13f, 0.11f, 0.1f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0.5f, 0f, 0f};
 
@@ -317,6 +317,7 @@ public class SenseMEFilter extends GPUImageFilter {
 
             mAccelerometer.stop();
 
+            mContext = null;
             updateStatus(Status.kRelease);
         }
     }

@@ -10,7 +10,7 @@ import java.util.List;
  */
 
 public class LangRtcConfig {
-    public static final String rtcAppId = "query-id-from-agora";// query this identifier from agora.io
+    public static final String rtcAppId = "6fa0a2b2d5a44f7b93d038eb17e975d5";
 
     public static final int RTC_VIDEO_PROFILE_120P = 0; //160x120   15fps   65kbps
     public static final int RTC_VIDEO_PROFILE_180P = 1; //320x180   15fps   140kbps

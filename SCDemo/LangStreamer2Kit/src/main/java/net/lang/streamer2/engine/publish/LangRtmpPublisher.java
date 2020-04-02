@@ -17,6 +17,7 @@ import net.lang.streamer2.utils.DebugLog;
 
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
+import java.util.Locale;
 
 public class LangRtmpPublisher implements Runnable, LangRtmpMuxer.IRtmpEventListener, LangStreamingBuffer.IStreamingBufferListener {
     private static final String TAG = LangRtmpPublisher.class.getSimpleName();
@@ -322,12 +323,16 @@ public class LangRtmpPublisher implements Runnable, LangRtmpMuxer.IRtmpEventList
         mRtmpMuxer = new LangRtmpMuxer(this);
 
         LangAudioConfiguration audioConfiguration = mRtmpConfiguration.getAudioConfiguration();
-        MediaFormat audioFormat = audioFormat(audioConfiguration);
-        mAudioTrackIndex = mRtmpMuxer.addTrack(audioFormat);
+        if (mRtmpConfiguration.getAudioConfiguration() != null) {
+            MediaFormat audioFormat = audioFormat(audioConfiguration);
+            mAudioTrackIndex = mRtmpMuxer.addTrack(audioFormat);
+        }
 
         LangVideoConfiguration videoConfiguration = mRtmpConfiguration.getVideoConfiguration();
-        MediaFormat videoFormat = videoFormat(videoConfiguration);
-        mVideoTrackIndex = mRtmpMuxer.addTrack(videoFormat);
+        if (videoConfiguration != null) {
+            MediaFormat videoFormat = videoFormat(videoConfiguration);
+            mVideoTrackIndex = mRtmpMuxer.addTrack(videoFormat);
+        }
 
         mStreamingBuffer = new LangStreamingBuffer(this);
     }
@@ -470,7 +475,7 @@ public class LangRtmpPublisher implements Runnable, LangRtmpMuxer.IRtmpEventList
         }
 
         int trackIndex = -1;
-        if (frame.isAudio()) {
+        if (frame.isAudio() && mRtmpConfiguration.isEnableAudio()) {
             if (!mSendAudioHeader) {
                 mSendAudioHeader = true;
                 ByteBuffer aacConfig = ByteBuffer.wrap(mAudioHeader);
@@ -480,7 +485,7 @@ public class LangRtmpPublisher implements Runnable, LangRtmpMuxer.IRtmpEventList
             }
             trackIndex = mAudioTrackIndex;
         } else {
-            if (!mSendVideoHeader) {
+            if (!mSendVideoHeader && mRtmpConfiguration.isEnableVideo()) {
                 mSendVideoHeader = true;
                 ByteBuffer h264SpsPps = ByteBuffer.wrap(mVideoHeader);
                 MediaCodec.BufferInfo h264SpsPpsInfo = new MediaCodec.BufferInfo();
@@ -493,8 +498,9 @@ public class LangRtmpPublisher implements Runnable, LangRtmpMuxer.IRtmpEventList
         ByteBuffer frameData = frame.getBuffer();
         MediaCodec.BufferInfo frameInfo = frame.getBufferInfo();
         mRtmpMuxer.writeSampleData(trackIndex, frameData, frameInfo);
-        //Log.d(TAG, String.format("handleWriteData trackIndex = %d, size = %d pts = %d",
-        //        trackIndex, frameInfo.size, frameInfo.presentationTimeUs));
+        DebugLog.v(TAG, String.format(Locale.getDefault(),
+                "handleWriteData trackIndex = %d, size = %d pts = %d",
+                trackIndex, frameInfo.size, frameInfo.presentationTimeUs));
 
         // frame statistics update.
         if (frame.isAudio()) {

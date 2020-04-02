@@ -6,12 +6,14 @@ import android.util.Log;
 import android.view.SurfaceView;
 
 import net.lang.gpuimage.helper.MagicFilterType;
+import net.lang.streamer2.config.LangAnimationConfig;
+import net.lang.streamer2.config.LangBeautyhairConfig;
 import net.lang.streamer2.config.LangFaceuConfig;
-import net.lang.streamer2.config.LangObjectSegmentationConfig;
 import net.lang.streamer2.config.LangRtcConfig;
 import net.lang.streamer2.config.LangStreamerConfig;
 import net.lang.streamer2.config.LangWatermarkConfig;
 import net.lang.streamer2.engine.capture.CaptureRuntimeException;
+import net.lang.streamer2.engine.data.LangAnimationStatus;
 import net.lang.streamer2.engine.data.LangAudioConfiguration;
 import net.lang.streamer2.engine.data.LangFrameStatistics;
 import net.lang.streamer2.engine.data.LangRtcConfiguration;
@@ -26,11 +28,6 @@ import net.lang.streamer2.faceu.IFaceuListener;
 import net.lang.streamer2.utils.DebugLog;
 import net.lang.streamer2.utils.FilterUtils;
 import net.lang.streamer2.utils.Permission;
-
-import org.jetbrains.annotations.Contract;
-import org.jetbrains.annotations.NotNull;
-
-import java.io.InputStream;
 
 public final class LangMediaCameraStreamer implements ILangCameraStreamer, LangMediaSessionListener {
     private static final String TAG = LangMediaCameraStreamer.class.getSimpleName();
@@ -144,6 +141,17 @@ public final class LangMediaCameraStreamer implements ILangCameraStreamer, LangM
     }
 
     @Override
+    public void enablePureAudio(boolean pureAudio) {
+        synchronized (mFence) {
+            if (status() != Status.kInit && status() != Status.kStop) {
+                DebugLog.w(TAG, "enablePureAudio should be called in right status");
+                return;
+            }
+            mMediaSession.enablePureAudio(pureAudio);
+        }
+    }
+
+    @Override
     public int startPreview() {
         synchronized (mFence) {
             if (status() == Status.kUnInit || status() == Status.kRelease) {
@@ -232,7 +240,10 @@ public final class LangMediaCameraStreamer implements ILangCameraStreamer, LangM
 
     @Override
     public LangRtmpInfo getLiveInfo() {
-        return null;
+        if (mRtmpStatus != LangRtmpStatus.LANG_RTMP_STATUS_START) {
+            return null;
+        }
+        return mRtmpLiveInfo;
     }
 
     @Override
@@ -407,12 +418,26 @@ public final class LangMediaCameraStreamer implements ILangCameraStreamer, LangM
     }
 
     @Override
-    public int setGiftAnimation(LangObjectSegmentationConfig params, InputStream inputStream, InputStream giftStream) {
+    public int setMattingAnimation(LangAnimationConfig config) {
+        synchronized (mFence) {
+            if (status() != Status.kStart) {
+                DebugLog.w(TAG, "setMattingAnimation failed due to invalid status");
+                return -1;
+            }
+            mMediaSession.setMattingAnimation(config);
+        }
         return 0;
     }
 
     @Override
-    public int setHairColors(LangObjectSegmentationConfig params) {
+    public int setHairColors(LangBeautyhairConfig config) {
+        synchronized (mFence) {
+            if (status() != Status.kStart) {
+                DebugLog.w(TAG, "setHairColors failed due to invalid status");
+                return -1;
+            }
+            mMediaSession.setHairColors(config);
+        }
         return 0;
     }
 
@@ -730,6 +755,22 @@ public final class LangMediaCameraStreamer implements ILangCameraStreamer, LangM
         sendError(error, errorCode);
     }
 
+    @Override
+    public void onSessionAnimationStatusChange(LangAnimationStatus animationStatus, int value) {
+        if (animationStatus == LangAnimationStatus.LANG_ANIMATION_STATUS_DECODING) {
+          sendEvent(LangStreamerEvent.LANG_EVENT_ANIMATION_LOADING, value);
+        } else if (animationStatus == LangAnimationStatus.LANG_ANIMATION_STATUS_READY) {
+            sendEvent(LangStreamerEvent.LANG_EVENT_ANIMATION_LOAD_SUCC, value);
+        } else if (animationStatus == LangAnimationStatus.LANG_ANIMATION_STATUS_ERROR) {
+            sendError(LangStreamerError.LANG_ERROR_LOAD_ANIMATON_FAIL, value);
+        } else if (animationStatus == LangAnimationStatus.LANG_ANIMATION_STATUS_PLAY) {
+            sendEvent(LangStreamerEvent.LANG_EVENT_ANIMATION_PLAYING, value);
+        } else if (animationStatus == LangAnimationStatus.LANG_ANIMATION_STATUS_COMPLETE) {
+            sendEvent(LangStreamerEvent.LANG_EVENT_ANIMATION_PLAY_END, value);
+        }
+        // other event should not be in this callback.
+    }
+
     private boolean initInternal(LangAudioConfiguration audioConfiguration,
                                  LangVideoConfiguration videoConfiguration,
                                  GLSurfaceView glSurfaceView) {
@@ -760,16 +801,23 @@ public final class LangMediaCameraStreamer implements ILangCameraStreamer, LangM
         return true;
     }
 
-
-    @NotNull
-    @Contract(value = "_ -> new", pure = true)
     private LangAudioConfiguration audioConfigurationFromConfig(LangStreamerConfig streamerConfig) {
+        LangAudioConfiguration.AudioEncoderType encoderType =
+                LangAudioConfiguration.AudioEncoderType.kHardware;
+        switch (streamerConfig.audioEncoderType) {
+            case LANG_AUDIO_ENCODER_HARDWARE:
+            case LANG_AUDIO_ENCODER_DEFAULT:
+                encoderType = LangAudioConfiguration.AudioEncoderType.kHardware;
+                break;
+            case LANG_AUDIO_ENCODER_FAAC:
+                encoderType = LangAudioConfiguration.AudioEncoderType.kSoftware;
+                break;
+        }
+
         return new LangAudioConfiguration(streamerConfig.audioSampleRate,
-                streamerConfig.audioChannel, streamerConfig.audioBitrate);
+                streamerConfig.audioChannel, streamerConfig.audioBitrate, encoderType);
     }
 
-    @NotNull
-    @Contract("_ -> new")
     private LangVideoConfiguration videoConfigurationFromConfig(LangStreamerConfig streamerConfig) {
         int outputWidth, outputHeight;
 
@@ -789,12 +837,25 @@ public final class LangMediaCameraStreamer implements ILangCameraStreamer, LangM
 
         int keyFrameIntervalSec = streamerConfig.videoMaxKeyframeInterval / streamerConfig.videoFPS;
 
+        LangVideoConfiguration.VideoEncoderType encoderType =
+                LangVideoConfiguration.VideoEncoderType.kHardware;;
+        switch (streamerConfig.videoEncoderType) {
+            case LANG_VIDEO_ENCODER_HARDWARE:
+            case LANG_VIDEO_ENCODER_DEFAULT:
+                encoderType = LangVideoConfiguration.VideoEncoderType.kHardware;
+                break;
+            case LANG_VIDEO_ENCODER_OPENH264:
+                encoderType = LangVideoConfiguration.VideoEncoderType.kSoftwareOpenH264;
+                break;
+            case LANG_VIDEO_ENCODER_X264:
+                encoderType = LangVideoConfiguration.VideoEncoderType.kSoftwareX264;
+                break;
+        }
+
         return new LangVideoConfiguration(outputWidth, outputHeight, streamerConfig.videoFPS,
-                streamerConfig.videoBitrate, keyFrameIntervalSec);
+                streamerConfig.videoBitrate, keyFrameIntervalSec, encoderType);
     }
 
-    @NotNull
-    @Contract(value = "_ -> new", pure = true)
     private LangAudioConfiguration audioConfigurationFromQuality(LangAudioQuality audioQuality) {
         int audioBitrate, audioSampleRate;
         int audioChannel = 2;
@@ -813,9 +874,7 @@ public final class LangMediaCameraStreamer implements ILangCameraStreamer, LangM
         return new LangAudioConfiguration(audioSampleRate, audioChannel, audioBitrate);
     }
 
-    @NotNull
-    @Contract("_ -> new")
-    private LangVideoConfiguration videoConfigurationFromQuality(@NotNull LangVideoQuality videoQuality) {
+    private LangVideoConfiguration videoConfigurationFromQuality(LangVideoQuality videoQuality) {
         int outputWidth = 0, outputHeight = 0, outputFps = 0, outputBitrate = 0;
         int keyFrameIntervalSec = 2;
 

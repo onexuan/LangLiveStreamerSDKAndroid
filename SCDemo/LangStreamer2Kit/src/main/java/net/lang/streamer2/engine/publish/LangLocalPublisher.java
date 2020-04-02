@@ -46,8 +46,12 @@ public class LangLocalPublisher implements Runnable {
     }
 
     public LangLocalPublisher(LangAudioConfiguration audioConfiguration, LangVideoConfiguration videoConfiguration) {
-        mAudioConfiguration = audioConfiguration.dup();
-        mVideoConfiguration = videoConfiguration.dup();
+        if (audioConfiguration != null) {
+            mAudioConfiguration = audioConfiguration.dup();
+        }
+        if (videoConfiguration != null) {
+            mVideoConfiguration = videoConfiguration.dup();
+        }
         mStreamingBuffer = new LangStreamingBuffer(null);
         initWorkerThread();
         mState = STATE.IDLE;

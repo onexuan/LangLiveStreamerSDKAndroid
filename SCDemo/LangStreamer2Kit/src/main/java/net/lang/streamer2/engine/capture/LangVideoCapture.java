@@ -6,10 +6,12 @@ import android.util.Size;
 
 import com.yunfan.graphicbuffer.GraphicBufferWrapper;
 
+import net.lang.gpuimage.filter.custom.IAnimationStatusListener;
 import net.lang.gpuimage.helper.MagicFilterType;
 
+import net.lang.streamer2.config.LangAnimationConfig;
+import net.lang.streamer2.config.LangBeautyhairConfig;
 import net.lang.streamer2.config.LangFaceuConfig;
-import net.lang.streamer2.config.LangObjectSegmentationConfig;
 import net.lang.streamer2.config.LangWatermarkConfig;
 import net.lang.streamer2.camera.CameraParams;
 import net.lang.streamer2.camera.ICameraInterface;
@@ -19,21 +21,15 @@ import net.lang.streamer2.engine.renderer.LangEffectRenderer;
 import net.lang.streamer2.faceu.IFaceuListener;
 import net.lang.streamer2.utils.DebugLog;
 
-import java.io.InputStream;
 import java.nio.FloatBuffer;
 
-public final class LangVideoCapture implements LangEffectRenderer.IRenderListener, IFaceuListener {
+public final class LangVideoCapture extends IBaseVideoCapture implements LangEffectRenderer.IRenderListener {
     private static final String TAG = LangVideoCapture.class.getSimpleName();
     private static final Size sDefaultPreviewSize = new Size(1280, 720);
-
-    private LangVideoCaptureListener mListener;
-    private IFaceuListener mFaceuListener;
 
     private final Object mFence = new Object();
     private boolean mRenderReady = false;
     private boolean mCameraReady = false;
-
-    private Size mVideoSize;
 
     private FloatBuffer mCameraEffectValue = null;
 
@@ -70,12 +66,7 @@ public final class LangVideoCapture implements LangEffectRenderer.IRenderListene
     };
 
     public LangVideoCapture(LangVideoConfiguration videoConfiguration) {
-
-        if (videoConfiguration.getLandscape()) {
-            mVideoSize = new Size(videoConfiguration.getWidth(), videoConfiguration.getHeight());
-        } else {
-            mVideoSize = new Size(videoConfiguration.getHeight(), videoConfiguration.getWidth());
-        }
+        super(videoConfiguration);
 
         mCameraParams = new CameraParams();
         mCameraParams.setPreviewWidth(sDefaultPreviewSize.getWidth());
@@ -90,7 +81,6 @@ public final class LangVideoCapture implements LangEffectRenderer.IRenderListene
     public void setSurfaceView(GLSurfaceView glSurfaceView) {
         mRenderer = new LangEffectRenderer(glSurfaceView.getContext());
         mRenderer.setRenderListener(this);
-        mRenderer.setFaceuListener(this);
         mRenderer.bindGlSurfaceView(glSurfaceView);
 
         glSurfaceView.setEGLContextClientVersion(2);
@@ -104,16 +94,11 @@ public final class LangVideoCapture implements LangEffectRenderer.IRenderListene
         return mGlSurafceView;
     }
 
-    public Size getVideoSize() {
-        return mVideoSize;
-    }
-
-    public void setCaptureListener(LangVideoCaptureListener listener) {
-        mListener = listener;
-    }
-
     public void setFaceuListener(IFaceuListener listener) {
-        mFaceuListener = listener;
+        if (mRenderer == null) {
+            throw new IllegalStateException("capture surfaceView has not been set");
+        }
+        mRenderer.setFaceuListener(listener);
     }
 
     public void start() {
@@ -122,7 +107,8 @@ public final class LangVideoCapture implements LangEffectRenderer.IRenderListene
             throw new IllegalStateException("capture surfaceView has not been set");
         }
         // set video encoder output size to graphicbuffer
-        mRenderer.setVideoOutputSize(mGlSurafceView.getContext(), mVideoSize.getWidth(), mVideoSize.getHeight());
+        mRenderer.setVideoOutputSize(mGlSurafceView.getContext(),
+                getVideoSize().getWidth(), getVideoSize().getHeight());
 
         mCameraInterface.openCamera(mCameraParams);
     }
@@ -244,12 +230,18 @@ public final class LangVideoCapture implements LangEffectRenderer.IRenderListene
         mRenderer.updateFaceuConfig(config);
     }
 
-    public void updateMattingConfig(final LangObjectSegmentationConfig params, final InputStream stream, final InputStream giftStream) {
-        //((LangMagicCameraView)baseView).updateMattingConfig(params, stream, giftStream);
+    public void updateMattingConfig(final LangAnimationConfig config, IAnimationStatusListener listener) {
+        if (mRenderer == null) {
+            throw new IllegalStateException("capture surfaceView has not been set");
+        }
+        mRenderer.updateMattingConfig(config, listener);
     }
 
-    public void updateBeautyHairConfig(final LangObjectSegmentationConfig params) {
-        //((LangMagicCameraView)baseView).updateBeautyHairConfig(params);
+    public void updateBeautyHairConfig(final LangBeautyhairConfig config) {
+        if (mRenderer == null) {
+            throw new IllegalStateException("capture surfaceView has not been set");
+        }
+        mRenderer.updateBeautyHairConfig(config);
     }
 
     public void enableMakeups(final boolean enable) {
@@ -261,6 +253,7 @@ public final class LangVideoCapture implements LangEffectRenderer.IRenderListene
         //((LangMagicCameraView)baseView).screenshot(path);
     }
 
+    @Override
     public double getPreviewFps() {
         return mRenderer.getPreviewFps();
     }
@@ -268,7 +261,6 @@ public final class LangVideoCapture implements LangEffectRenderer.IRenderListene
     public void release() {
         mRenderer.release();
         mListener = null;
-        mFaceuListener = null;
     }
 
 
@@ -324,27 +316,5 @@ public final class LangVideoCapture implements LangEffectRenderer.IRenderListene
         if (mListener != null) {
             mListener.onCapturedVideoFrame(gb, timestampNs);
         }
-    }
-
-    // implements IFaceuListener
-    @Override
-    public void onHumanFaceDetected(int faceCount) {
-        if (mFaceuListener != null) {
-            mFaceuListener.onHumanFaceDetected(faceCount);
-        }
-    }
-
-    @Override
-    public void onHumanHandDetected(int handCount, FaceuGestureType gesture) {
-        if (mFaceuListener != null) {
-            mFaceuListener.onHumanHandDetected(handCount, gesture);
-        }
-    }
-
-    public interface LangVideoCaptureListener {
-
-        boolean skip(long timestampNs);
-
-        void onCapturedVideoFrame(GraphicBufferWrapper gb, long timestampNs);
     }
 }

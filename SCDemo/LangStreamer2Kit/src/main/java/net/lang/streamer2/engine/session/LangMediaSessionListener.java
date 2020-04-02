@@ -2,6 +2,7 @@ package net.lang.streamer2.engine.session;
 
 import net.lang.streamer2.LangRtcInfo;
 import net.lang.streamer2.LangRtcUser;
+import net.lang.streamer2.engine.data.LangAnimationStatus;
 import net.lang.streamer2.engine.data.LangFrameStatistics;
 import net.lang.streamer2.engine.data.LangRtcEvent;
 import net.lang.streamer2.engine.data.LangRtmpBufferStatus;
@@ -35,4 +36,6 @@ public interface LangMediaSessionListener {
     void onSessionRecordProgressUpdate(long milliSeconds);
 
     void onSessionRecordError(int errorCode, String description);
+
+    void onSessionAnimationStatusChange(LangAnimationStatus animationStatus, int value);
 }

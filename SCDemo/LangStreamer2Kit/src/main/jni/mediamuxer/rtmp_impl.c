@@ -48,11 +48,26 @@ typedef struct rtmp_impl_context {
     uint8_t * pps;
     int32_t pps_length;
 
-    uint8_t* nal_bitstream;
+    uint8_t* bitstream;
 
     audio_stream_info* audio_info;
     video_stream_info* video_info;
 } rtmp_impl_context;
+
+static void* aligned_malloc(size_t required_bytes, size_t alignment) {
+    void *p1;
+    void **p2;
+    size_t offset = alignment -1 + sizeof(void*);
+    p1 = malloc(required_bytes + offset);               // the line you are missing
+    p2 = (void**)(((size_t)(p1) + offset)&~(alignment - 1));  //line 5
+    p2[-1] = p1; //line 6
+    return p2;
+}
+
+static void aligned_free(void* p) {
+    void* p1 = ((void**)p)[-1];         // get the pointer to the buffer we allocated
+    free(p1);
+}
 
 static void rtmp_log_debug(int level, const char *format, va_list args) {
     if (level > RTMP_LOGWARNING)
@@ -77,7 +92,7 @@ static void rtmp_connection_time_callback(PILI_CONNECTION_TIME* connTime, void* 
     uint32_t connect_time = connTime->connect_time;
     uint32_t handshake_time = connTime->handshake_time;
     ALOGI("rtmp_connection_time_callback: connect_time = %d handshake_time = %d",
-            connect_time, handshake_time);
+          connect_time, handshake_time);
 }
 
 static void build_flv_meta_data(rtmp_impl_context* rtmp_context, uint8_t** metaData, int* metaDataSize)
@@ -89,32 +104,36 @@ static void build_flv_meta_data(rtmp_impl_context* rtmp_context, uint8_t** metaD
     audio_stream_info* audio_info = rtmp_context->audio_info;
     video_stream_info* video_info = rtmp_context->video_info;
 
-    //enc_str(&enc, end, "@setDataFrame"); //++rayman
+    enc_str(&enc, end, "@setDataFrame"); //++rayman
     enc_str(&enc, end, "onMetaData");
 
-    *enc++ = AMF_ECMA_ARRAY;
-    enc = AMF_EncodeInt32(enc, end, 14);
-    //*enc++ = AMF_OBJECT;
+    //*enc++ = AMF_ECMA_ARRAY;
+    //enc = AMF_EncodeInt32(enc, end, 14);
+    *enc++ = AMF_OBJECT;
 
     enc_num_val(&enc, end, "duration", 0.0);
     enc_num_val(&enc, end, "fileSize", 0.0);
 
     // video meta data.
-    enc_num_val(&enc, end, "width", (double)video_info->width);
-    enc_num_val(&enc, end, "height", (double)video_info->height);
-    enc_str_val(&enc, end, "videocodecid", "avc1");
-    enc_num_val(&enc, end, "videodatarate", (double)video_info->bitrate_kbps);
-    enc_num_val(&enc, end, "framerate", (double)video_info->frame_rate);
+    if (rtmp_context->video_info) {
+        enc_num_val(&enc, end, "width", (double)video_info->width);
+        enc_num_val(&enc, end, "height", (double)video_info->height);
+        enc_str_val(&enc, end, "videocodecid", "avc1");
+        enc_num_val(&enc, end, "videodatarate", (double)video_info->bitrate_kbps);
+        enc_num_val(&enc, end, "framerate", (double)video_info->frame_rate);
+    }
 
     // audio meta data
-    enc_str_val(&enc, end, "audiocodecid", "mp4a");
-    enc_num_val(&enc, end, "audiodatarate", (double)audio_info->bitrate_kbps);
-    enc_num_val(&enc, end, "audiosamplerate", (double)audio_info->sample_rate);
-    enc_num_val(&enc, end, "audiosamplesize", (double)audio_info->bits_per_sample);
-    enc_num_val(&enc, end, "audiochannels", (double)audio_info->channel);
-    enc_bool_val(&enc, end, "stereo", audio_info->channel == 2);
+    if (rtmp_context->audio_info) {
+        enc_str_val(&enc, end, "audiocodecid", "mp4a");
+        enc_num_val(&enc, end, "audiodatarate", (double)audio_info->bitrate_kbps);
+        enc_num_val(&enc, end, "audiosamplerate", (double)audio_info->sample_rate);
+        enc_num_val(&enc, end, "audiosamplesize", (double)audio_info->bits_per_sample);
+        //enc_num_val(&enc, end, "audiochannels", (double)audio_info->channel);
+        enc_bool_val(&enc, end, "stereo", audio_info->channel == 2);
+    }
 
-    enc_str_val(&enc, end, "encoder", "snail-rtmp-streamer-0.5.0");
+    enc_str_val(&enc, end, "encoder", "langlive-android-rtmp-streamer-1.0.0");
     *enc++ = 0;
     *enc++ = 0;
     *enc++ = AMF_OBJECT_END;
@@ -191,7 +210,7 @@ static int send_audio_header(rtmp_impl_context* rtmp_context,
 {
     int result = 0;
     int32_t  output_length = data_length + 2;
-    uint8_t* output = (uint8_t *)malloc(sizeof(uint8_t) * output_length);
+    uint8_t* output = rtmp_context->bitstream;//(uint8_t *)malloc(sizeof(uint8_t) * output_length);
     uint32_t offset = 0;
 
     //flv AudioTagHeader
@@ -202,8 +221,8 @@ static int send_audio_header(rtmp_impl_context* rtmp_context,
     memcpy(output + offset, data, data_length);
 
     result = send_packet(rtmp_context, RTMP_PACKET_TYPE_AUDIO, output, output_length, pts);
-    free(output);
-    output = NULL;
+    //free(output);
+    //output = NULL;
 
     return result;
 }
@@ -215,7 +234,7 @@ static int send_audio_frame(rtmp_impl_context* rtmp_context,
 {
     int result = 0;
     int32_t  output_length = data_length + 2;
-    uint8_t* output = (uint8_t *)malloc(sizeof(uint8_t) * output_length);
+    uint8_t* output = rtmp_context->bitstream;//(uint8_t *)malloc(sizeof(uint8_t) * output_length);
     uint32_t offset = 0;
 
     //flv AudioTagHeader
@@ -226,8 +245,8 @@ static int send_audio_frame(rtmp_impl_context* rtmp_context,
     memcpy(output + offset, data, data_length);
 
     result = send_packet(rtmp_context, RTMP_PACKET_TYPE_AUDIO, output, output_length, pts);
-    free(output);
-    output = NULL;
+    //free(output);
+    //output = NULL;
 
     return result;
 }
@@ -241,7 +260,7 @@ static int send_video_header(rtmp_impl_context* rtmp_context,
 {
     int result = 0;
 
-    uint8_t* output = (uint8_t *)malloc(sizeof(uint8_t) * 1024);
+    uint8_t* output = rtmp_context->bitstream;//(uint8_t *)malloc(sizeof(uint8_t) * 1024);
     uint32_t offset = 0;
 
 
@@ -274,7 +293,7 @@ static int send_video_header(rtmp_impl_context* rtmp_context,
     offset += pps_length;
 
     result = send_packet(rtmp_context, RTMP_PACKET_TYPE_VIDEO, output, offset, pts);
-    free(output);
+    //free(output);
 
     return result;
 }
@@ -288,7 +307,7 @@ static int send_video_frame(rtmp_impl_context* rtmp_context,
 {
     int result = 0;
     int32_t  output_length = data_length + 9;
-    uint8_t* output = (uint8_t *)malloc(sizeof(uint8_t) * output_length);
+    uint8_t* output = rtmp_context->bitstream;//(uint8_t *)malloc(sizeof(uint8_t) * output_length);
     uint32_t offset = 0;
 
     int time_offset = (int)(pts - dts);
@@ -311,7 +330,7 @@ static int send_video_frame(rtmp_impl_context* rtmp_context,
     memcpy(output + offset, data, data_length);
 
     result = send_packet(rtmp_context, RTMP_PACKET_TYPE_VIDEO, output, output_length, pts);
-    free(output);
+    //free(output);
 
     return result;
 }
@@ -319,33 +338,50 @@ static int send_video_frame(rtmp_impl_context* rtmp_context,
 void rtmp_impl_destroy(rtmp_impl_context* rtmp_context)
 {
     if (rtmp_context) {
-        if (rtmp_context->callback) {
-            free(rtmp_context->callback);
-        }
-        if (rtmp_context->rtmp) {
-            PILI_RTMP_Free(rtmp_context->rtmp);
-        }
-        if (rtmp_context->rtmp_error) {
-            free(rtmp_context->rtmp_error);
-        }
-        if (rtmp_context->rtmp_body_data) {
-            free(rtmp_context->rtmp_body_data);
-        }
-        if (rtmp_context->sps) {
-            free(rtmp_context->sps);
-        }
-        if (rtmp_context->pps) {
-            free(rtmp_context->pps);
-        }
-        if (rtmp_context->nal_bitstream) {
-            free(rtmp_context->nal_bitstream);
-        }
         if (rtmp_context->audio_info) {
             free(rtmp_context->audio_info);
+            rtmp_context->audio_info = NULL;
         }
         if (rtmp_context->video_info) {
             free(rtmp_context->video_info);
+            rtmp_context->video_info = NULL;
         }
+
+        if (rtmp_context->callback) {
+            free(rtmp_context->callback);
+            rtmp_context->callback = NULL;
+        }
+
+        if (rtmp_context->rtmp) {
+            PILI_RTMP_Free(rtmp_context->rtmp);
+            rtmp_context->rtmp = NULL;
+        }
+        if (rtmp_context->rtmp_error) {
+            free(rtmp_context->rtmp_error);
+            rtmp_context->rtmp_error = NULL;
+        }
+
+        if (rtmp_context->rtmp_body_data) {
+            aligned_free(rtmp_context->rtmp_body_data);
+            rtmp_context->rtmp_body_data = NULL;
+        }
+        if (rtmp_context->aac_codec_specific_data) {
+            aligned_free(rtmp_context->aac_codec_specific_data);
+            rtmp_context->aac_codec_specific_data = NULL;
+        }
+        if (rtmp_context->sps) {
+            aligned_free(rtmp_context->sps);
+            rtmp_context->sps = NULL;
+        }
+        if (rtmp_context->pps) {
+            aligned_free(rtmp_context->pps);
+            rtmp_context->pps = NULL;
+        }
+        if (rtmp_context->bitstream) {
+            aligned_free(rtmp_context->bitstream);
+            rtmp_context->bitstream = NULL;
+        }
+
         free(rtmp_context);
         rtmp_context = NULL;
     }
@@ -356,13 +392,12 @@ rtmp_impl_context* rtmp_impl_create()
     rtmp_impl_context* rtmp_context = (rtmp_impl_context *)calloc(1, sizeof(rtmp_impl_context));
     rtmp_impl_callback_context* rtmp_callback_context =
             (rtmp_impl_callback_context *)calloc(1, sizeof(rtmp_impl_callback_context));
-    uint8_t* rtmp_body_data = (uint8_t *)malloc(sizeof(uint8_t) * 40960);
-    uint8_t* aac_codec_specific_data = (uint8_t *)malloc(sizeof(uint8_t) * 1024);
-    uint8_t* sps = (uint8_t *)malloc(sizeof(uint8_t) * 4096);
-    uint8_t* pps = (uint8_t *)malloc(sizeof(uint8_t) * 4096);
-    uint8_t* nal_bitstream = (uint8_t *)malloc(sizeof(uint8_t*) * 81920);
-    audio_stream_info* audio_info = calloc(1, sizeof(audio_stream_info));
-    video_stream_info* video_info = calloc(1, sizeof(video_stream_info));
+
+    uint8_t* rtmp_body_data = (uint8_t *)aligned_malloc(sizeof(uint8_t) * 409600, 16);
+    uint8_t* aac_codec_specific_data = (uint8_t *)aligned_malloc(sizeof(uint8_t) * 1024, 16);
+    uint8_t* sps = (uint8_t *)aligned_malloc(sizeof(uint8_t) * 4096, 16);
+    uint8_t* pps = (uint8_t *)aligned_malloc(sizeof(uint8_t) * 4096, 16);
+    uint8_t* bitstream = (uint8_t *)aligned_malloc(sizeof(uint8_t*) * 409600, 16);
 
 
     rtmp_context->callback = rtmp_callback_context;
@@ -373,9 +408,9 @@ rtmp_impl_context* rtmp_impl_create()
     rtmp_context->sps_length = 0;
     rtmp_context->pps = pps;
     rtmp_context->pps_length = 0;
-    rtmp_context->nal_bitstream = nal_bitstream;
-    rtmp_context->audio_info = audio_info;
-    rtmp_context->video_info = video_info;
+    rtmp_context->bitstream = bitstream;
+    rtmp_context->audio_info = NULL; //audio_info;
+    rtmp_context->video_info = NULL; //video_info;
     return rtmp_context;
 }
 
@@ -423,11 +458,16 @@ int rtmp_impl_add_audio_track(rtmp_impl_context* rtmp_context,
         return -1;
     }
 
-    audio_stream_info* audio_info = rtmp_context->audio_info;
+    //audio_stream_info* audio_info = rtmp_context->audio_info;
+    audio_stream_info* audio_info = calloc(1, sizeof(audio_stream_info));
     audio_info->sample_rate = sample_rate;
     audio_info->channel = channel;
     audio_info->bits_per_sample = bits_per_sample;
     audio_info->bitrate_kbps = bitrate_kbps;
+    rtmp_context->audio_info = audio_info;
+
+    ALOGD("[%s]: audio info sample_rate=%d channel=%d bits_per_sample=%d bitrate_kbps=%d",
+          __FUNCTION__, sample_rate, channel, bits_per_sample, bitrate_kbps);
 
     return 0;
 }
@@ -442,11 +482,16 @@ int rtmp_impl_add_video_track(rtmp_impl_context* rtmp_context,
         return -1;
     }
 
-    video_stream_info* video_info = rtmp_context->video_info;
+    //video_stream_info* video_info = rtmp_context->video_info;
+    video_stream_info* video_info = calloc(1, sizeof(video_stream_info));
     video_info->width = width;
     video_info->height = height;
     video_info->frame_rate = frame_rate;
     video_info->bitrate_kbps = bitrate_kbps;
+    rtmp_context->video_info = video_info;
+
+    ALOGD("[%s]: video info width=%d height=%d frame_rate=%d bitrate_kbps=%d",
+          __FUNCTION__, width, height, frame_rate, bitrate_kbps);
 
     return 0;
 }
@@ -491,7 +536,7 @@ int rtmp_impl_start(rtmp_impl_context* rtmp_context, const char *url)
     // connect server
     if (PILI_RTMP_Connect(rtmp, NULL, rtmp_error) == FALSE) {
         ALOGW("[%s]: PILI_RTMP_Connect(%s) failed(code：%d reason: %s)\n",
-                __FUNCTION__, url, rtmp_error->code, rtmp_error->message);
+              __FUNCTION__, url, rtmp_error->code, rtmp_error->message);
         if (rtmp_context->callback->error_callback) {
             rtmp_context->callback->error_callback(rtmp_context, rtmp_error->message);
         }
@@ -501,7 +546,7 @@ int rtmp_impl_start(rtmp_impl_context* rtmp_context, const char *url)
     // connect stream
     if (PILI_RTMP_ConnectStream(rtmp, 0, rtmp_error) == FALSE) {
         ALOGW("[%s]: PILI_RTMP_ConnectStream(%s) failed(code:%d reason: %s)\n",
-                __FUNCTION__, url, rtmp_error->code, rtmp_error->message);
+              __FUNCTION__, url, rtmp_error->code, rtmp_error->message);
         if (rtmp_context->callback->error_callback) {
             rtmp_context->callback->error_callback(rtmp_context, rtmp_error->message);
         }
@@ -551,7 +596,7 @@ int rtmp_impl_write_audio_header(rtmp_impl_context* rtmp_context,
     rtmp_context->aac_codec_specific_data_length = data_length;
 
     send_audio_header(rtmp_context, rtmp_context->aac_codec_specific_data,
-            rtmp_context->aac_codec_specific_data_length, pts);
+                      rtmp_context->aac_codec_specific_data_length, pts);
 
     return 0;
 }
@@ -598,7 +643,7 @@ int rtmp_impl_write_video_header(rtmp_impl_context* rtmp_context,
     }
 
     send_video_header(rtmp_context, rtmp_context->sps, rtmp_context->sps_length,
-            rtmp_context->pps, rtmp_context->pps_length, pts);
+                      rtmp_context->pps, rtmp_context->pps_length, pts);
 
     return 0;
 }
@@ -613,10 +658,10 @@ int rtmp_impl_write_audio(rtmp_impl_context* rtmp_context,
 }
 
 int rtmp_impl_write_video(rtmp_impl_context* rtmp_context,
-                         const uint8_t* data,
-                         const int32_t data_length,
-                         const int64_t pts,
-                         const int64_t dts)
+                          const uint8_t* data,
+                          const int32_t data_length,
+                          const int64_t pts,
+                          const int64_t dts)
 {
     int result = 0;
     uint8_t* video_data = NULL;
@@ -628,13 +673,14 @@ int rtmp_impl_write_video(rtmp_impl_context* rtmp_context,
     bool sps_changed = false;
     bool pps_changed = false;
 
-    memcpy(rtmp_context->nal_bitstream, data, (size_t)data_length);
-    memset(rtmp_context->nal_bitstream + data_length, 0, 4);
-    uint8_t* payload = rtmp_context->nal_bitstream;//(unsigned char*)data;
+    //memcpy(rtmp_context->bitstream, data, (size_t)data_length);
+    //memset(rtmp_context->bitstream + data_length, 0, 4);
+    //uint8_t* payload = rtmp_context->bitstream;
+    uint8_t* payload = (unsigned char*)data;
     int payload_size = data_length;
 
-    while (get_nal_unit(payload, payload_size,
-            &nal_start, &nal_size, &start_code_length, &nal_type) == 0) {
+    while (payload_size > 0 && get_nal_unit(payload, payload_size,
+                                            &nal_start, &nal_size, &start_code_length, &nal_type) == 0) {
         payload += nal_size;
         payload_size -= nal_size;
         nal_start += start_code_length; // skip start code.
@@ -647,7 +693,7 @@ int rtmp_impl_write_video(rtmp_impl_context* rtmp_context,
         // for sps
         if (nal_type == AVC_SPS) {
             ALOGI("[%s]: sps updated sc=%dB len=%dB frame=%dB",
-                    __FUNCTION__, start_code_length, nal_size, nal_size + start_code_length);
+                  __FUNCTION__, start_code_length, nal_size, nal_size + start_code_length);
             memcpy(rtmp_context->sps, nal_start, (size_t)nal_size);
             rtmp_context->sps_length = nal_size;
             sps_changed = true;
@@ -656,7 +702,7 @@ int rtmp_impl_write_video(rtmp_impl_context* rtmp_context,
         // for pps
         if (nal_type == AVC_PPS) {
             ALOGI("[%s]: pps updated sc=%dB len=%dB frame=%dB",
-                    __FUNCTION__, start_code_length, nal_size, nal_size + start_code_length);
+                  __FUNCTION__, start_code_length, nal_size, nal_size + start_code_length);
             memcpy(rtmp_context->pps, nal_start, (size_t)nal_size);
             rtmp_context->pps_length = nal_size;
             pps_changed = true;
@@ -665,24 +711,26 @@ int rtmp_impl_write_video(rtmp_impl_context* rtmp_context,
         // filter extra sei/aud payload.
         if (nal_type == AVC_SEI || nal_type == AVC_AUD) {
             ALOGD("[%s]: skip useless nal_unit_type(%d) frame=%dB",
-                    __FUNCTION__, nal_type, nal_size + start_code_length);
+                  __FUNCTION__, nal_type, nal_size + start_code_length);
             continue;
         }
 
         video_data = nal_start;
         video_data_length = nal_size;
+
+        //ALOGD("[%s]: nal unit type = %d length = %d pts = %lld",
+        //        __FUNCTION__, nal_type, video_data_length, pts);
     }
 
     if (sps_changed || pps_changed) {
         result = send_video_header(rtmp_context,rtmp_context->sps, rtmp_context->sps_length,
-                rtmp_context->pps, rtmp_context->pps_length, pts);
+                                   rtmp_context->pps, rtmp_context->pps_length, pts);
     }
 
-    if (video_data && video_data_length && result == 0) {
-
-        uint8_t priority = (video_data[0] >> 5);
-        bool key_frame = (priority == 0x05);
-        return send_video_frame(rtmp_context, data, data_length, pts, dts, key_frame);
+    if (video_data && video_data_length /*&& result == 0*/) {
+        bool key_frame = (nal_type == 0x05);
+        //ALOGD("[%s]: send video data nal_type = %d length = %d pts = %lld", __FUNCTION__, nal_type,video_data_length, pts);
+        return send_video_frame(rtmp_context, video_data, video_data_length, pts, dts, key_frame);
     }
     return result;
 }

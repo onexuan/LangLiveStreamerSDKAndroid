@@ -10,6 +10,8 @@ public class LangVideoEncoderFactory {
             return new LangVideoPipelineEncoder(videoConfiguration);
         } else if (videoConfiguration.getEncoderType() == LangVideoConfiguration.VideoEncoderType.kHardware) {
             return new LangVideoHardwareEncoder(videoConfiguration);
+        } else if (videoConfiguration.getEncoderType() == LangVideoConfiguration.VideoEncoderType.kSoftwareOpenH264) {
+            return new LangOpenh264Encoder(videoConfiguration);
         } else {
             throw new RuntimeException("other type of video encoder is not supported now");
         }

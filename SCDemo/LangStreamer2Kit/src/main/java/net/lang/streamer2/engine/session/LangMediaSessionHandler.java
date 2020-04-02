@@ -5,6 +5,7 @@ import android.os.Message;
 
 import net.lang.streamer2.LangRtcInfo;
 import net.lang.streamer2.LangRtcUser;
+import net.lang.streamer2.engine.data.LangAnimationStatus;
 import net.lang.streamer2.engine.data.LangFrameStatistics;
 import net.lang.streamer2.engine.data.LangRtcEvent;
 import net.lang.streamer2.engine.data.LangRtmpBufferStatus;
@@ -33,6 +34,7 @@ public class LangMediaSessionHandler extends Handler {
     private static final int MSG_RECOED_PROGRESS_CHANGED = 12;
     private static final int MSG_RECORD_ERROR = 13;
 
+    private static final int MSG_ANIMATION_STATUS_CHANGED = 14;
 
     private WeakReference<LangMediaSessionListener> mWeakListener;
 
@@ -101,6 +103,10 @@ public class LangMediaSessionHandler extends Handler {
         obtainMessage(MSG_RECORD_ERROR, error, 0, errorDescription).sendToTarget();
     }
 
+    public void notifyAnimationStatusChanged(LangAnimationStatus animationStatus, int value) {
+        obtainMessage(MSG_ANIMATION_STATUS_CHANGED, value, 0, animationStatus).sendToTarget();
+    }
+
     @Override  // runs on UI thread
     public void handleMessage(Message msg) {
         LangMediaSessionListener listener = mWeakListener.get();
@@ -149,6 +155,9 @@ public class LangMediaSessionHandler extends Handler {
                 break;
             case MSG_RECORD_ERROR:
                 listener.onSessionRecordError(msg.arg1, (String)msg.obj);
+                break;
+            case MSG_ANIMATION_STATUS_CHANGED:
+                listener.onSessionAnimationStatusChange((LangAnimationStatus)msg.obj, msg.arg1);
                 break;
             default:
                 throw new RuntimeException("unknown msg " + msg.what);
