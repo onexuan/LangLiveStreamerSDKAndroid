@@ -10,7 +10,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.9.0"
+        versionName "1.9.1"
 
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
         ndk {
@@ -35,11 +35,6 @@ android {
         ndkBuild {
             path 'src/main/jni/Android.mk'
         }
-    }
-
-    aaptOptions {
-        noCompress "tflite"
-        noCompress "lite"
     }
 
     libraryVariants.all { variant ->
@@ -70,7 +65,6 @@ dependencies {
     implementation 'com.android.support:appcompat-v7:25.2.0'
     testImplementation 'junit:junit:4.12'
 
-    implementation files('libs/LangAIKit_1.1.2.aar')
     implementation project(':AgoraRTCLib')
     implementation project(':LangGPUImageLib')
     implementation project(':SenseMeLibrary')

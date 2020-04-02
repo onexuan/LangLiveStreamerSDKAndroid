@@ -23,7 +23,6 @@ import net.lang.streamer.engine.LangAudioEncoder;
 import net.lang.streamer.engine.data.LangEngineParams;
 import net.lang.streamer.rtc.IRtcSessionManager;
 import net.lang.streamer.rtc.LangRtcSessionMgrCreator;
-import net.lang.streamer.utils.Accelerometer;
 import net.lang.streamer.engine.LangMagicEngine;
 import net.lang.streamer.engine.LangMediaPublisher;
 import net.lang.streamer.engine.LangVideoEncoder;
@@ -50,7 +49,6 @@ public class LangCameraStreamer extends LangCameraStreamerListener
     public final static int RTMP_UNCONNECT = 0;
     public final static int RTMP_CONNECTING = 1;
     public final static int RTMP_CONNECTED = 2;
-    private Accelerometer mAccelerometer;
     private LangMagicEngine mEngine;
     private LangMediaPublisher mPublisher;
     private LangAudioEncoder mAudioEncoder;
@@ -358,7 +356,6 @@ public class LangCameraStreamer extends LangCameraStreamerListener
 
         mVideoEncoder = mPublisher.getVideoEncoder();
         mAudioEncoder = mPublisher.getAudioEncoder();
-        mAccelerometer = new Accelerometer(mView.getContext());
         mRtcManager = LangRtcSessionMgrCreator.createRtcSessionManager(this, mView.getContext(), mEngine);
         updateStatus(Status.kInit);
         return 0;
@@ -404,7 +401,6 @@ public class LangCameraStreamer extends LangCameraStreamerListener
                 sendError(LangStreamerError.LANG_ERROR_NO_PERMISSIONS, 0);
                 return -1;
             }
-            mAccelerometer.start();
             mEngine.enableAudio(true); //set audio capture thread running.
             mEngine.onResume();
             if (!checkCamera())
@@ -465,7 +461,6 @@ public class LangCameraStreamer extends LangCameraStreamerListener
             stopStreaming();
             stopRecording();
             mView.onPause();
-            mAccelerometer.stop();
             mEngine.enableAudio(false); //set audio capture thread stop.
             super.stopPreview();
         }

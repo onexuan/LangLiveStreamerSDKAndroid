@@ -11,7 +11,7 @@ import java.util.List;
  */
 
 public class LangRtcConfig {
-    public static final String rtcAppId = "query-id-from-agora";// query this identifier from agora.io
+    public static final String rtcAppId = "6fa0a2b2d5a44f7b93d038eb17e975d5";
     public static boolean localMixed = false;   // audio/video mix using mobile device.
 
     // please check details string_array_resolutions/string_array_frame_rate/string_array_bit_rate at strings_config.xml
